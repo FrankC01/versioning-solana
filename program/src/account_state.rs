@@ -6,47 +6,50 @@ use solana_program::{
     program_error::ProgramError,
     program_memory::sol_memcpy,
     program_pack::{IsInitialized, Pack, Sealed},
-    pubkey::Pubkey,
 };
 use std::mem;
-
-/// Declaration of the data version. This
-/// constant changes
-pub const DATA_VERSION: u8 = 0;
 
 /// Currently using state. If version changes occur, this
 /// should be copied to another serializable backlevel one
 /// before adding new fields here
 #[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
 pub struct AccountContentCurrent {
-    pub somekey: Pubkey,
+    pub somevalue: u64,
 }
 
-// impl AccountContentCurrent {
-//     pub fn set_key(&mut self, other_key: Pubkey) {
-//         self.somekey = other_key
-//     }
-// }
-/// Maintains global accumulator
+/// Maintains account data
 #[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
 pub struct ProgramAccountState {
-    pub is_initialized: bool,
-    pub data_version: u8,
-    pub account_data: AccountContentCurrent,
+    is_initialized: bool,
+    data_version: u8,
+    account_data: AccountContentCurrent,
 }
 
 impl ProgramAccountState {
-    ///
+    /// Signal initialized
     pub fn set_initialized(&mut self) {
         self.is_initialized = true;
     }
-    pub fn get_content(&self) -> &AccountContentCurrent {
+    /// Get the initialized flag
+    pub fn initialized(&self) -> bool {
+        self.is_initialized
+    }
+    /// Gets the current data version
+    pub fn version(&self) -> u8 {
+        self.data_version
+    }
+    /// Get the reference to content structure
+    pub fn content(&self) -> &AccountContentCurrent {
         &self.account_data
     }
-    pub fn get_content_mut(&mut self) -> &mut AccountContentCurrent {
+    /// Get the mutable reference to content structure
+    pub fn content_mut(&mut self) -> &mut AccountContentCurrent {
         &mut self.account_data
     }
 }
+
+/// Declaration of the current data version.
+pub const DATA_VERSION: u8 = 0;
 
 const IS_INITIALIZED: usize = 1;
 const DATA_VERSION_ID: usize = 1;
@@ -55,22 +58,29 @@ pub const INTERMMEDIATE_SIZE: usize = IS_INITIALIZED + DATA_VERSION_ID;
 pub const PREVIOUS_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
 pub const PREVIOUS_ACCOUNT_SPACE: usize =
     IS_INITIALIZED + DATA_VERSION_ID + PREVIOUS_VERSION_DATA_SIZE;
+
 pub const CURRENT_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
 pub const ACCOUNT_STATE_SPACE: usize = IS_INITIALIZED + DATA_VERSION_ID + CURRENT_VERSION_DATA_SIZE;
+
+pub const PROGRAM_ACCOUNT_SIZE: usize = mem::size_of::<ProgramAccountState>();
 
 /// Future data migration logic that converts prior state of data
 /// to current state of data
 fn conversion_logic(src: &[u8]) -> Result<ProgramAccountState, ProgramError> {
     let past = array_ref![src, 0, PREVIOUS_ACCOUNT_SPACE];
-    let (initialized, dversion, _account_space) = array_refs![
+    let (initialized, _, _account_space) = array_refs![
         past,
         IS_INITIALIZED,
         DATA_VERSION_ID,
         PREVIOUS_VERSION_DATA_SIZE
     ];
+    // Logic to uplift from previous version
+    // GOES HERE
+
+    // Give back
     Ok(ProgramAccountState {
         is_initialized: initialized[0] != 0u8,
-        data_version: dversion[0],
+        data_version: DATA_VERSION,
         account_data: AccountContentCurrent::default(),
     })
 }
@@ -81,6 +91,7 @@ impl IsInitialized for ProgramAccountState {
         self.is_initialized
     }
 }
+
 impl Pack for ProgramAccountState {
     const LEN: usize = ACCOUNT_STATE_SPACE;
 
@@ -98,9 +109,9 @@ impl Pack for ProgramAccountState {
         if initialized {
             // Version check
             if header[1] == DATA_VERSION {
-                let current = array_ref![src, 0, ACCOUNT_STATE_SPACE];
+                // let current = array_ref![src, 0, ACCOUNT_STATE_SPACE];
                 let (_, _, account_space) = array_refs![
-                    current,
+                    array_ref![src, 0, ACCOUNT_STATE_SPACE],
                     IS_INITIALIZED,
                     DATA_VERSION_ID,
                     CURRENT_VERSION_DATA_SIZE
@@ -115,7 +126,7 @@ impl Pack for ProgramAccountState {
             }
         } else {
             Ok(ProgramAccountState {
-                is_initialized: initialized,
+                is_initialized: false,
                 data_version: header[1],
                 account_data: AccountContentCurrent::default(),
             })

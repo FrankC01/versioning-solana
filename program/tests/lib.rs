@@ -1,9 +1,10 @@
 //! test processor framework
 
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshDeserialize;
 use solana_data_versioning::{
     account_state::{ProgramAccountState, ACCOUNT_STATE_SPACE},
     entry_point::process_instruction,
+    instruction::ProgramInstruction,
 };
 use solana_program::{
     hash::Hash,
@@ -17,32 +18,6 @@ use solana_sdk::{
 };
 
 const PROGRAM_ID: Pubkey = pubkey!("PWDnx8LkjJUn9bAVzG6Fp6BuvB41x7DkBZdo9YLMGcc");
-
-#[cfg(test)]
-mod tests {
-    use borsh::BorshSerialize;
-    use solana_data_versioning::account_state::{
-        AccountContentCurrent, ProgramAccountState, ACCOUNT_STATE_SPACE, CURRENT_VERSION_DATA_SIZE,
-        INTERMMEDIATE_SIZE,
-    };
-    use solana_program::pubkey::Pubkey;
-
-    #[test]
-    fn test_size() {
-        println!("Intermmediate size {}", INTERMMEDIATE_SIZE);
-        println!("Content size {}", CURRENT_VERSION_DATA_SIZE);
-        println!("Total space size {}", ACCOUNT_STATE_SPACE);
-        let x = ProgramAccountState {
-            is_initialized: true,
-            data_version: 0,
-            account_data: AccountContentCurrent {
-                somekey: Pubkey::new_unique(),
-            },
-        };
-        let x_ser = x.account_data.try_to_vec().unwrap();
-        println!("{:?}", x_ser);
-    }
-}
 
 /// Sets up the Program test and initializes 'n' program_accounts
 async fn setup(program_accounts: &[Pubkey]) -> (BanksClient, Keypair, Hash) {
@@ -67,16 +42,10 @@ async fn setup(program_accounts: &[Pubkey]) -> (BanksClient, Keypair, Hash) {
     program_test.start().await
 }
 
-#[derive(BorshSerialize, Debug)]
-enum InstructionPayload {
-    Initialize,
-    FailInstruction,
-}
-
 /// Submit transaction with relevant instruction data
 #[allow(clippy::ptr_arg)]
 async fn submit_txn(
-    instruction_data: &InstructionPayload,
+    instruction_data: &ProgramInstruction,
     accounts: &[AccountMeta],
     payer: &dyn Signer,
     recent_blockhash: Hash,
@@ -96,7 +65,7 @@ async fn submit_txn(
 
 #[tokio::test]
 /// Validates initialization processing
-async fn test_initialize_pass() {
+async fn test_initialize_prechange_pass() {
     // Setup runtime testing and accounts
     let account_pubkey = Pubkey::new_unique();
     let (mut banks_client, payer, recent_blockhash) = setup(&[account_pubkey]).await;
@@ -116,7 +85,7 @@ async fn test_initialize_pass() {
 
     // Initialize account
     let result = submit_txn(
-        &InstructionPayload::Initialize,
+        &ProgramInstruction::InitializeAccount,
         &[AccountMeta::new(account_pubkey, false)],
         &payer,
         recent_blockhash,
@@ -129,9 +98,9 @@ async fn test_initialize_pass() {
     match banks_client.get_account(account_pubkey).await.unwrap() {
         Some(acc) => {
             let acc_deser = ProgramAccountState::try_from_slice(&acc.data).unwrap();
-            assert!(acc_deser.is_initialized);
-            assert_eq!(acc_deser.get_content().somekey, account_pubkey);
-            assert_eq!(acc_deser.data_version, 0);
+            assert!(acc_deser.initialized());
+            assert_eq!(acc_deser.content().somevalue, 1);
+            assert_eq!(acc_deser.version(), 0);
         }
         None => panic!(),
     }
@@ -139,13 +108,13 @@ async fn test_initialize_pass() {
 
 #[tokio::test]
 /// Validates unknown instruction processing
-async fn test_unknown_instruction_pass() {
+async fn test_unknown_instruction_error_pass() {
     // Setup runtime testing and accounts
     let account_pubkey = Pubkey::new_unique();
     let (mut banks_client, payer, recent_blockhash) = setup(&[account_pubkey]).await;
     // Initialize account
     let result = submit_txn(
-        &InstructionPayload::FailInstruction,
+        &ProgramInstruction::FailInstruction,
         &[AccountMeta::new(account_pubkey, false)],
         &payer,
         recent_blockhash,

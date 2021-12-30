@@ -36,21 +36,32 @@ fn initialize_account(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let program_account = next_account_info(account_info_iter)?;
     let mut account_data = program_account.data.borrow_mut();
-
+    msg!("{:?}", account_data);
     // Just using unpack will check to see if initialized and will
     // fail if not
     let mut account_state = ProgramAccountState::unpack_unchecked(&account_data)?;
-    // Where this is a logic error in trying to initialize the same
-    // account more than once
+    // Where this is a logic error in trying to initialize the same account more than once
     if account_state.is_initialized() {
         return Err(DataVersionError::AlreadyInitializedState.into());
     } else {
         account_state.set_initialized();
-        account_state.get_content_mut().somekey = program_account.key.clone();
+        account_state.content_mut().somevalue = 1;
     }
+    msg!("Account Initialized");
+    // Serialize
+    ProgramAccountState::pack(account_state, &mut account_data)
+}
 
-    ProgramAccountState::pack(account_state, &mut account_data).unwrap();
-    Ok(())
+/// Sets the u64 in the content structure
+fn set_u64_value(accounts: &[AccountInfo], value: u64) -> ProgramResult {
+    msg!("Initialize account");
+    let account_info_iter = &mut accounts.iter();
+    let program_account = next_account_info(account_info_iter)?;
+    let mut account_data = program_account.data.borrow_mut();
+    let mut account_state = ProgramAccountState::unpack(&account_data)?;
+    account_state.content_mut().somevalue = value;
+    // Serialize
+    ProgramAccountState::pack(account_state, &mut account_data)
 }
 /// Main processing entry point dispatches to specific
 /// instruction handlers
@@ -63,26 +74,15 @@ pub fn process(
     // Check the account for program relationship
     if let Err(error) = check_account_ownership(program_id, accounts) {
         return Err(error);
-    }
+    };
     // Unpack the inbound data, mapping instruction to appropriate structure
     let instruction = ProgramInstruction::unpack(instruction_data)?;
     match instruction {
         ProgramInstruction::InitializeAccount => initialize_account(accounts),
-        //     ProgramInstruction::MintToAccount { key, value } => {
-        //         mint_keypair_to_account(accounts, key, value)
-        //     }
-        //     ProgramInstruction::TransferBetweenAccounts { key } => {
-        //         transfer_keypair_to_account(accounts, key)
-        //     }
-        //     ProgramInstruction::BurnFromAccount { key } => burn_keypair_from_account(accounts, key),
-        //     ProgramInstruction::MintToAccountWithFee { key, value } => {
-        //         mint_keypair_to_account_with_fee(accounts, key, value)
-        //     }
-        //     ProgramInstruction::TransferBetweenAccountsWithFee { key } => {
-        //         transfer_keypair_to_account_with_fee(accounts, key)
-        //     }
-        //     ProgramInstruction::BurnFromAccountWithFee { key } => {
-        //         burn_keypair_from_account_with_fee(accounts, key)
-        //     }
+        ProgramInstruction::SetU64Value(value) => set_u64_value(accounts, value),
+        _ => {
+            msg!("Received unknown instruction");
+            Err(DataVersionError::InvalidInstruction.into())
+        }
     }
 }

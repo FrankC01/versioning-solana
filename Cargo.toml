@@ -6,8 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+arrayref = "0.3.6"
+base64 = "0.13.0"
+borsh = "0.9.1"
+solana-client = "1.9.2"
+solana-data-versioning = {path = "program"}
+solana-program = "1.9.2"
+solana-sdk = "1.9.2"
 
 [workspace]
 members = [
     "program",
 ]
+
+[dev-dependencies]
+solana-logger = "1.9.2"
+solana-validator = "1.9.2"
