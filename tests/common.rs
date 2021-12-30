@@ -5,6 +5,7 @@ use solana_data_versioning::{account_state::ACCOUNT_STATE_SPACE, instruction::Pr
 
 use solana_program::{
     instruction::{AccountMeta, Instruction},
+    message::Message,
     pubkey::Pubkey,
     system_instruction,
 };
@@ -12,7 +13,7 @@ use solana_sdk::{
     account::Account,
     commitment_config::CommitmentConfig,
     pubkey,
-    signature::{read_keypair_file, Keypair},
+    signature::{read_keypair_file, Keypair, Signature},
     signer::Signer,
     transaction::Transaction,
 };
@@ -77,6 +78,54 @@ pub fn get_keypair(keyname: &str) -> Result<Keypair, Box<dyn error::Error>> {
         Ok(kp) => Ok(kp),
     }
 }
+
+/// Submits the program instruction as per the
+/// instruction definition
+fn submit_transaction(
+    rpc_client: &RpcClient,
+    wallet_signer: &dyn Signer,
+    instruction: Instruction,
+    commitment_config: CommitmentConfig,
+) -> Result<Signature, Box<dyn std::error::Error>> {
+    let mut transaction =
+        Transaction::new_unsigned(Message::new(&[instruction], Some(&wallet_signer.pubkey())));
+    let recent_blockhash = rpc_client
+        .get_latest_blockhash()
+        .map_err(|err| format!("error: unable to get recent blockhash: {}", err))?;
+    transaction
+        .try_sign(&vec![wallet_signer], recent_blockhash)
+        .map_err(|err| format!("error: failed to sign transaction: {}", err))?;
+    let signature = rpc_client
+        .send_and_confirm_transaction_with_spinner_and_commitment(&transaction, commitment_config)
+        .map_err(|err| format!("error: send transaction: {}", err))?;
+    Ok(signature)
+}
+
+/// Set a well know field on the account
+pub fn set_u64_value(
+    rpc_client: &RpcClient,
+    wallet_signer: &dyn Signer,
+    account_pair: &dyn Signer,
+    value: u64,
+    cc: CommitmentConfig,
+) -> Result<Account, Box<dyn std::error::Error>> {
+    let accounts = &[AccountMeta::new(account_pair.pubkey(), false)];
+
+    let instruction = Instruction::new_with_borsh(
+        PROG_KEY,
+        &ProgramInstruction::SetU64Value(value),
+        accounts.to_vec(),
+    );
+    submit_transaction(rpc_client, wallet_signer, instruction, cc)?;
+
+    Ok(rpc_client
+        .get_account_with_commitment(&account_pair.pubkey(), cc)
+        .map_err(|err| format!("error: getting account after initialization: {}", err))
+        .unwrap()
+        .value
+        .unwrap())
+}
+
 /// Create a new program account with account state data allocation
 fn new_account(
     rpc_client: &RpcClient,

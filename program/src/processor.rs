@@ -36,7 +36,6 @@ fn initialize_account(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let program_account = next_account_info(account_info_iter)?;
     let mut account_data = program_account.data.borrow_mut();
-    msg!("{:?}", account_data);
     // Just using unpack will check to see if initialized and will
     // fail if not
     let mut account_state = ProgramAccountState::unpack_unchecked(&account_data)?;
@@ -54,7 +53,7 @@ fn initialize_account(accounts: &[AccountInfo]) -> ProgramResult {
 
 /// Sets the u64 in the content structure
 fn set_u64_value(accounts: &[AccountInfo], value: u64) -> ProgramResult {
-    msg!("Initialize account");
+    msg!("Set new value {}", value);
     let account_info_iter = &mut accounts.iter();
     let program_account = next_account_info(account_info_iter)?;
     let mut account_data = program_account.data.borrow_mut();

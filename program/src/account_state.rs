@@ -3,11 +3,11 @@
 use arrayref::{array_ref, array_refs};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
+    msg,
     program_error::ProgramError,
-    program_memory::sol_memcpy,
     program_pack::{IsInitialized, Pack, Sealed},
 };
-use std::mem;
+use std::{io::BufWriter, mem};
 
 /// Currently using state. If version changes occur, this
 /// should be copied to another serializable backlevel one
@@ -51,18 +51,27 @@ impl ProgramAccountState {
 /// Declaration of the current data version.
 pub const DATA_VERSION: u8 = 0;
 
+/// Account allocated size
+pub const ACCOUNT_ALLOCATION_SIZE: usize = 1024;
+/// Initialized flag is 1st byte of data block
 const IS_INITIALIZED: usize = 1;
+/// Data version (current) is 2nd byte of data block
 const DATA_VERSION_ID: usize = 1;
-pub const INTERMMEDIATE_SIZE: usize = IS_INITIALIZED + DATA_VERSION_ID;
 
+/// Previous content data size (before changing this is equal to current)
 pub const PREVIOUS_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
+/// Total space occupied by previous account data
 pub const PREVIOUS_ACCOUNT_SPACE: usize =
     IS_INITIALIZED + DATA_VERSION_ID + PREVIOUS_VERSION_DATA_SIZE;
 
+/// Current content data size
 pub const CURRENT_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
-pub const ACCOUNT_STATE_SPACE: usize = IS_INITIALIZED + DATA_VERSION_ID + CURRENT_VERSION_DATA_SIZE;
-
-pub const PROGRAM_ACCOUNT_SIZE: usize = mem::size_of::<ProgramAccountState>();
+/// Total usage for data only
+pub const CURRENT_USED_SIZE: usize = IS_INITIALIZED + DATA_VERSION_ID + CURRENT_VERSION_DATA_SIZE;
+/// How much of 1024 is used
+pub const CURRENT_UNUSED_SIZE: usize = ACCOUNT_ALLOCATION_SIZE - CURRENT_USED_SIZE;
+/// Current space used by header (initialized, data version and Content)
+pub const ACCOUNT_STATE_SPACE: usize = CURRENT_USED_SIZE + CURRENT_UNUSED_SIZE;
 
 /// Future data migration logic that converts prior state of data
 /// to current state of data
@@ -97,37 +106,31 @@ impl Pack for ProgramAccountState {
 
     /// Store 'state' of account to its data area
     fn pack_into_slice(&self, dst: &mut [u8]) {
-        let data_out = self.try_to_vec().unwrap();
-        sol_memcpy(dst, &data_out, data_out.len());
+        let mut bw = BufWriter::new(dst);
+        self.serialize(&mut bw).unwrap();
     }
 
     /// Retrieve 'state' of account from account data area
     fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let header = array_ref![src, 0, INTERMMEDIATE_SIZE];
-        let initialized = header[0] != 0;
+        let initialized = src[0] != 0;
         // Check initialized
         if initialized {
             // Version check
-            if header[1] == DATA_VERSION {
-                // let current = array_ref![src, 0, ACCOUNT_STATE_SPACE];
-                let (_, _, account_space) = array_refs![
-                    array_ref![src, 0, ACCOUNT_STATE_SPACE],
-                    IS_INITIALIZED,
-                    DATA_VERSION_ID,
-                    CURRENT_VERSION_DATA_SIZE
-                ];
-                Ok(ProgramAccountState {
-                    is_initialized: initialized,
-                    data_version: header[1],
-                    account_data: AccountContentCurrent::try_from_slice(account_space).unwrap(),
-                })
+            if src[1] == DATA_VERSION {
+                msg!("Processing consistent data");
+                Ok(
+                    ProgramAccountState::try_from_slice(array_ref![src, 0, CURRENT_USED_SIZE])
+                        .unwrap(),
+                )
             } else {
+                msg!("Processing backlevel data");
                 conversion_logic(src)
             }
         } else {
+            msg!("Processing pre-initialized data");
             Ok(ProgramAccountState {
                 is_initialized: false,
-                data_version: header[1],
+                data_version: src[1],
                 account_data: AccountContentCurrent::default(),
             })
         }

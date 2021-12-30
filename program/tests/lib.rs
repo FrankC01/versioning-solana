@@ -2,7 +2,7 @@
 
 use borsh::BorshDeserialize;
 use solana_data_versioning::{
-    account_state::{ProgramAccountState, ACCOUNT_STATE_SPACE},
+    account_state::{ProgramAccountState, ACCOUNT_STATE_SPACE, CURRENT_USED_SIZE},
     entry_point::process_instruction,
     instruction::ProgramInstruction,
 };
@@ -97,7 +97,9 @@ async fn test_initialize_prechange_pass() {
     // Verify initialized
     match banks_client.get_account(account_pubkey).await.unwrap() {
         Some(acc) => {
-            let acc_deser = ProgramAccountState::try_from_slice(&acc.data).unwrap();
+            let indata = &acc.data[..CURRENT_USED_SIZE];
+            println!("data {:?}", indata);
+            let acc_deser = ProgramAccountState::try_from_slice(indata).unwrap();
             assert!(acc_deser.initialized());
             assert_eq!(acc_deser.content().somevalue, 1);
             assert_eq!(acc_deser.version(), 0);
