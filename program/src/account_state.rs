@@ -140,7 +140,7 @@ impl Pack for ProgramAccountState {
             msg!("Processing pre-initialized data");
             Ok(ProgramAccountState {
                 is_initialized: false,
-                data_version: src[1],
+                data_version: DATA_VERSION,
                 account_data: AccountContentCurrent::default(),
             })
         }
