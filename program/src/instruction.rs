@@ -11,6 +11,7 @@ use {
 pub enum ProgramInstruction {
     InitializeAccount,
     SetU64Value(u64),
+    SetString(String),
     FailInstruction,
 }
 
@@ -22,6 +23,7 @@ impl ProgramInstruction {
         match payload {
             ProgramInstruction::InitializeAccount => Ok(payload),
             ProgramInstruction::SetU64Value(_) => Ok(payload),
+            ProgramInstruction::SetString(_) => Ok(payload), // Added with data version change
             _ => Err(DataVersionError::InvalidInstruction.into()),
         }
     }

@@ -3,6 +3,7 @@
 use arrayref::{array_ref, array_refs};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
+    borsh::try_from_slice_unchecked,
     msg,
     program_error::ProgramError,
     program_pack::{IsInitialized, Pack, Sealed},
@@ -14,6 +15,14 @@ use std::{io::BufWriter, mem};
 /// before adding new fields here
 #[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
 pub struct AccountContentCurrent {
+    pub somevalue: u64,
+    pub somestring: String,
+}
+
+/// Old content using state. This was the previous state
+/// of AccountContentCurrent and is used to migrate data
+#[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
+pub struct AccountContentOld {
     pub somevalue: u64,
 }
 
@@ -49,27 +58,27 @@ impl ProgramAccountState {
 }
 
 /// Declaration of the current data version.
-pub const DATA_VERSION: u8 = 0;
+const DATA_VERSION: u8 = 1; // Adding string to content
+                            // Previous const DATA_VERSION: u8 = 0;
 
 /// Account allocated size
-pub const ACCOUNT_ALLOCATION_SIZE: usize = 1024;
+const ACCOUNT_ALLOCATION_SIZE: usize = 1024;
 /// Initialized flag is 1st byte of data block
 const IS_INITIALIZED: usize = 1;
 /// Data version (current) is 2nd byte of data block
 const DATA_VERSION_ID: usize = 1;
 
 /// Previous content data size (before changing this is equal to current)
-pub const PREVIOUS_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
+const PREVIOUS_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentOld>();
 /// Total space occupied by previous account data
-pub const PREVIOUS_ACCOUNT_SPACE: usize =
-    IS_INITIALIZED + DATA_VERSION_ID + PREVIOUS_VERSION_DATA_SIZE;
+const PREVIOUS_ACCOUNT_SPACE: usize = IS_INITIALIZED + DATA_VERSION_ID + PREVIOUS_VERSION_DATA_SIZE;
 
 /// Current content data size
-pub const CURRENT_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
+const CURRENT_VERSION_DATA_SIZE: usize = mem::size_of::<AccountContentCurrent>();
 /// Total usage for data only
-pub const CURRENT_USED_SIZE: usize = IS_INITIALIZED + DATA_VERSION_ID + CURRENT_VERSION_DATA_SIZE;
+const CURRENT_USED_SIZE: usize = IS_INITIALIZED + DATA_VERSION_ID + CURRENT_VERSION_DATA_SIZE;
 /// How much of 1024 is used
-pub const CURRENT_UNUSED_SIZE: usize = ACCOUNT_ALLOCATION_SIZE - CURRENT_USED_SIZE;
+const CURRENT_UNUSED_SIZE: usize = ACCOUNT_ALLOCATION_SIZE - CURRENT_USED_SIZE;
 /// Current space used by header (initialized, data version and Content)
 pub const ACCOUNT_STATE_SPACE: usize = CURRENT_USED_SIZE + CURRENT_UNUSED_SIZE;
 
@@ -85,12 +94,16 @@ fn conversion_logic(src: &[u8]) -> Result<ProgramAccountState, ProgramError> {
     ];
     // Logic to uplift from previous version
     // GOES HERE
+    let old = try_from_slice_unchecked::<AccountContentOld>(src).unwrap();
+    // Default sets somevalue to 0 and somestring to ""
+    let mut new_content = AccountContentCurrent::default();
+    new_content.somevalue = old.somevalue;
 
     // Give back
     Ok(ProgramAccountState {
         is_initialized: initialized[0] != 0u8,
         data_version: DATA_VERSION,
-        account_data: AccountContentCurrent::default(),
+        account_data: new_content,
     })
 }
 impl Sealed for ProgramAccountState {}
@@ -117,11 +130,8 @@ impl Pack for ProgramAccountState {
         if initialized {
             // Version check
             if src[1] == DATA_VERSION {
-                msg!("Processing consistent data");
-                Ok(
-                    ProgramAccountState::try_from_slice(array_ref![src, 0, CURRENT_USED_SIZE])
-                        .unwrap(),
-                )
+                msg!("Processing consistent version data");
+                Ok(try_from_slice_unchecked::<ProgramAccountState>(src).unwrap())
             } else {
                 msg!("Processing backlevel data");
                 conversion_logic(src)

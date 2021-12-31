@@ -126,6 +126,31 @@ pub fn set_u64_value(
         .unwrap())
 }
 
+/// Set a well know field on the account
+pub fn set_string_value(
+    rpc_client: &RpcClient,
+    wallet_signer: &dyn Signer,
+    account_pair: &dyn Signer,
+    value: String,
+    cc: CommitmentConfig,
+) -> Result<Account, Box<dyn std::error::Error>> {
+    let accounts = &[AccountMeta::new(account_pair.pubkey(), false)];
+
+    let instruction = Instruction::new_with_borsh(
+        PROG_KEY,
+        &ProgramInstruction::SetString(value),
+        accounts.to_vec(),
+    );
+    submit_transaction(rpc_client, wallet_signer, instruction, cc)?;
+
+    Ok(rpc_client
+        .get_account_with_commitment(&account_pair.pubkey(), cc)
+        .map_err(|err| format!("error: getting account after initialization: {}", err))
+        .unwrap()
+        .value
+        .unwrap())
+}
+
 /// Create a new program account with account state data allocation
 fn new_account(
     rpc_client: &RpcClient,

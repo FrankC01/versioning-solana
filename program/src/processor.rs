@@ -62,6 +62,18 @@ fn set_u64_value(accounts: &[AccountInfo], value: u64) -> ProgramResult {
     // Serialize
     ProgramAccountState::pack(account_state, &mut account_data)
 }
+
+/// Sets the string in the content structure
+fn set_string_value(accounts: &[AccountInfo], value: String) -> ProgramResult {
+    msg!("Set new string {}", value);
+    let account_info_iter = &mut accounts.iter();
+    let program_account = next_account_info(account_info_iter)?;
+    let mut account_data = program_account.data.borrow_mut();
+    let mut account_state = ProgramAccountState::unpack(&account_data)?;
+    account_state.content_mut().somestring = value;
+    // Serialize
+    ProgramAccountState::pack(account_state, &mut account_data)
+}
 /// Main processing entry point dispatches to specific
 /// instruction handlers
 pub fn process(
@@ -79,6 +91,7 @@ pub fn process(
     match instruction {
         ProgramInstruction::InitializeAccount => initialize_account(accounts),
         ProgramInstruction::SetU64Value(value) => set_u64_value(accounts, value),
+        ProgramInstruction::SetString(value) => set_string_value(accounts, value),
         _ => {
             msg!("Received unknown instruction");
             Err(DataVersionError::InvalidInstruction.into())
