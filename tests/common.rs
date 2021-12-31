@@ -17,7 +17,8 @@ use solana_sdk::{
     signer::Signer,
     transaction::Transaction,
 };
-use solana_validator::test_validator::TestValidatorGenesis;
+use solana_streamer::socket::SocketAddrSpace;
+use solana_validator::test_validator::{TestValidator, TestValidatorGenesis};
 use std::{
     error,
     path::{Path, PathBuf},
@@ -34,19 +35,37 @@ pub const PROG_KEY: Pubkey = pubkey!("PWDnx8LkjJUn9bAVzG6Fp6BuvB41x7DkBZdo9YLMGc
 const KEY_ACCOUNTS_BASE_PATH: &str = "./keys/accounts";
 pub const USER1_ACCOUNT: &str = "user1_account.json";
 pub const USER2_ACCOUNT: &str = "user2_account.json";
+const WALLET_ACCOUNT: &str = "version_wallet.json";
+
+/// Loads a keypair from path provided
+pub fn get_keypair(keyname: &str) -> Result<Keypair, Box<dyn error::Error>> {
+    let path = Path::new(KEY_ACCOUNTS_BASE_PATH).join(keyname);
+    match read_keypair_file(&path) {
+        Err(e) => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("could not read keypair file \"{}\". Run \"solana-keygen new\" to create a keypair file: {}",
+                path.display(), e),
+        )
+        .into()),
+        Ok(kp) => Ok(kp),
+    }
+}
 
 /// Setup the test validator with predefined properties
-pub fn setup_validator() -> TestValidatorGenesis {
+pub fn setup_validator() -> Result<(TestValidator, Keypair), Box<dyn error::Error>> {
+    let vwallet = get_keypair(WALLET_ACCOUNT).unwrap();
     std::env::set_var("BPF_OUT_DIR", PROG_PATH);
     let mut test_validator = TestValidatorGenesis::default();
     test_validator.ledger_path(LEDGER_PATH);
     test_validator.add_program(PROG_NAME, PROG_KEY);
     // solana_logger::setup_with_default("solana=error");
-    test_validator
+    let test_validator =
+        test_validator.start_with_mint_address(vwallet.pubkey(), SocketAddrSpace::new(false))?;
+    Ok((test_validator, vwallet))
 }
 
 /// Ensures an empty ledger before setting up the validator
-pub fn clean_ledger_setup_validator() -> TestValidatorGenesis {
+pub fn clean_ledger_setup_validator() -> Result<(TestValidator, Keypair), Box<dyn error::Error>> {
     if PathBuf::from_str(LEDGER_PATH).unwrap().exists() {
         std::fs::remove_dir_all(LEDGER_PATH).unwrap();
     }
@@ -63,20 +82,6 @@ pub fn get_account_for_key(
         .get_account_with_commitment(key, commitment_config)
         .unwrap()
         .value
-}
-
-/// Loads a keypair from path provided
-pub fn get_keypair(keyname: &str) -> Result<Keypair, Box<dyn error::Error>> {
-    let path = Path::new(KEY_ACCOUNTS_BASE_PATH).join(keyname);
-    match read_keypair_file(&path) {
-        Err(e) => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("could not read keypair file \"{}\". Run \"solana-keygen new\" to create a keypair file: {}",
-                path.display(), e),
-        )
-        .into()),
-        Ok(kp) => Ok(kp),
-    }
 }
 
 /// Submits the program instruction as per the

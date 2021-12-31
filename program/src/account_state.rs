@@ -50,7 +50,6 @@ impl ProgramAccountState {
 
 /// Declaration of the current data version.
 pub const DATA_VERSION: u8 = 0;
-
 /// Account allocated size
 pub const ACCOUNT_ALLOCATION_SIZE: usize = 1024;
 /// Initialized flag is 1st byte of data block
@@ -130,7 +129,7 @@ impl Pack for ProgramAccountState {
             msg!("Processing pre-initialized data");
             Ok(ProgramAccountState {
                 is_initialized: false,
-                data_version: src[1],
+                data_version: DATA_VERSION,
                 account_data: AccountContentCurrent::default(),
             })
         }

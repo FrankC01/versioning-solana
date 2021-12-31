@@ -22,3 +22,4 @@ members = [
 [dev-dependencies]
 solana-logger = "1.9.2"
 solana-validator = "1.9.2"
+solana-streamer = "1.9.2"
