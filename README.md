@@ -41,16 +41,19 @@ What do you do? There are a few options:
 7. `code .`
 8. Open the `prechange.rs` file in the main `test` folder
 9. Click `Run Test` on `fn test_load_pass()`
-10. Exit code
-11. `mkdir stored`
-12. Open another terminal and change to this repo folder then
-13. `solana-test-validator -l ./.ledger`
-14. From the first folder terminal:
+10. Open the `postchange.rs` file
+11 Click `Run Test` on `fn test_pre_data_change_load_pass()`
+12. Exit code
+13. `mkdir stored`
+14. Open another terminal and change to this repo folder then
+15. `solana-test-validator -l ./.ledger`
+16. From the first folder terminal:
     * `solana account -o stored/user1.json --output json-compact keys/accounts/user1_account.json`
     * `solana account -o stored/user2.json --output json-compact keys/accounts/user2_account.json`
-15. In the terminal running `solana-test-validator` hit Ctrl+C to kill it
+17. In the terminal running `solana-test-validator` hit Ctrl+C to kill it
 
-This will create two accounts with `somevalue` to 1 and then modify user account #1's value to `50u64`
+This will create two accounts with `somevalue` to 1 and then modify each of their 1's value to `50u64`.
+Steps 13 - 16 are to export the accounts from the ledger for use in the next steps.
 
 #### First Version (`data_version` = 1)
 1. From repo main folder run `cargo clean`
@@ -61,3 +64,7 @@ This will create two accounts with `somevalue` to 1 and then modify user account
 6. `code .`
 7. Open the `postchange.rs` file in the main `test` folder
 8. Click `Run Test` on `fn test_post_data_change_u2_pass()`
+
+The results will be as below
+
+<img src="images/versioning-solana-v1.png" alt="alt text" width="430" height="220">

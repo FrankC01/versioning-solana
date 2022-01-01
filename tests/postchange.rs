@@ -41,7 +41,7 @@ fn test_post_data_change_u2_pass() {
         &rpc_client,
         &initial_keypair,
         &u2keypair,
-        String::from("Brandone"),
+        String::from("Hello"),
         cc,
     )
     .unwrap();
