@@ -1,3 +1,4 @@
 target/
+stored/
 .ledger/
 Cargo.lock

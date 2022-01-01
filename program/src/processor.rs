@@ -82,7 +82,7 @@ pub fn process(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    msg!("Received process request");
+    msg!("Received process request 0.2.0");
     // Check the account for program relationship
     if let Err(error) = check_account_ownership(program_id, accounts) {
         return Err(error);

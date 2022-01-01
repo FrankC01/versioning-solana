@@ -20,7 +20,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use solana_streamer::socket::SocketAddrSpace;
-use solana_validator::test_validator::{TestValidator, TestValidatorGenesis};
+use solana_validator::test_validator::{AccountInfo, TestValidator, TestValidatorGenesis};
 use std::{
     error,
     path::{Path, PathBuf},
@@ -37,7 +37,13 @@ pub const PROG_KEY: Pubkey = pubkey!("PWDnx8LkjJUn9bAVzG6Fp6BuvB41x7DkBZdo9YLMGc
 const KEY_ACCOUNTS_BASE_PATH: &str = "./keys/accounts";
 pub const USER1_ACCOUNT: &str = "user1_account.json";
 pub const USER2_ACCOUNT: &str = "user2_account.json";
+const USER_ACCOUNT_LIST: [&str; 2] = [USER1_ACCOUNT, USER2_ACCOUNT];
 const WALLET_ACCOUNT: &str = "version_wallet.json";
+
+// Stored account info
+const STORED_USER1_JSON: &str = "./stored/user1.json";
+const STORED_USER2_JSON: &str = "./stored/user2.json";
+const USER_STORED_LIST: [&str; 2] = [STORED_USER1_JSON, STORED_USER2_JSON];
 
 /// Loads a keypair from path provided
 pub fn get_keypair(keyname: &str) -> Result<Keypair, Box<dyn error::Error>> {
@@ -53,6 +59,18 @@ pub fn get_keypair(keyname: &str) -> Result<Keypair, Box<dyn error::Error>> {
     }
 }
 
+fn load_stored(tvg: &mut TestValidatorGenesis) -> &mut TestValidatorGenesis {
+    let mut avec = Vec::<AccountInfo>::new();
+    for i in 0..2 {
+        let akp = get_keypair(USER_ACCOUNT_LIST[i]).unwrap();
+        avec.push(AccountInfo {
+            address: akp.pubkey(),
+            filename: USER_STORED_LIST[i],
+        });
+    }
+    tvg.add_accounts_from_json_files(&avec)
+}
+
 /// Setup the test validator with predefined properties
 pub fn setup_validator() -> Result<(TestValidator, Keypair), Box<dyn error::Error>> {
     let vwallet = get_keypair(WALLET_ACCOUNT).unwrap();
@@ -60,6 +78,8 @@ pub fn setup_validator() -> Result<(TestValidator, Keypair), Box<dyn error::Erro
     let mut test_validator = TestValidatorGenesis::default();
     test_validator.ledger_path(LEDGER_PATH);
     test_validator.add_program(PROG_NAME, PROG_KEY);
+    load_stored(&mut test_validator);
+
     // solana_logger::setup_with_default("solana=error");
     let test_validator =
         test_validator.start_with_mint_address(vwallet.pubkey(), SocketAddrSpace::new(true))?;
