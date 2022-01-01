@@ -2,7 +2,7 @@
 
 use solana_data_versioning::{
     account_state::ACCOUNT_STATE_SPACE, entry_point::process_instruction,
-    instruction::ProgramInstruction,
+    instruction::VersionProgramInstruction,
 };
 use solana_program::{
     hash::Hash,
@@ -48,7 +48,7 @@ async fn setup(program_accounts: &[Pubkey]) -> (BanksClient, Keypair, Hash) {
 /// Submit transaction with relevant instruction data
 #[allow(clippy::ptr_arg)]
 async fn submit_txn(
-    instruction_data: &ProgramInstruction,
+    instruction_data: &VersionProgramInstruction,
     accounts: &[AccountMeta],
     payer: &dyn Signer,
     recent_blockhash: Hash,
@@ -90,7 +90,7 @@ async fn test_initialize_prechange_pass() {
     println!("Recent BH {:?}", recent_blockhash);
     let macc = [AccountMeta::new(account_pubkey, false)];
     let result = submit_txn(
-        &ProgramInstruction::InitializeAccount,
+        &VersionProgramInstruction::InitializeAccount,
         &macc,
         &payer,
         recent_blockhash,
@@ -106,7 +106,7 @@ async fn test_initialize_prechange_pass() {
         .unwrap()
         .unwrap();
     assert_eq!(acc.data[0], 1);
-    assert_eq!(acc.data[1], 0);
+    assert_eq!(acc.data[1], 1);
     assert_eq!(acc.data[2], 1);
 
     // Wait for new blockhash
@@ -115,7 +115,7 @@ async fn test_initialize_prechange_pass() {
     println!("New BH {:?}", new_blockhash);
     // Initialize account twice fail
     let bad_result = submit_txn(
-        &ProgramInstruction::InitializeAccount,
+        &VersionProgramInstruction::InitializeAccount,
         &macc,
         &payer,
         new_blockhash,
@@ -130,7 +130,7 @@ async fn test_initialize_prechange_pass() {
     println!("New2 BH {:?}", new2_blockhash);
     // Initialize account twice fail
     let set_result = submit_txn(
-        &ProgramInstruction::SetU64Value(50u64),
+        &VersionProgramInstruction::SetU64Value(50u64),
         &macc,
         &payer,
         new2_blockhash,
@@ -145,8 +145,32 @@ async fn test_initialize_prechange_pass() {
         .unwrap()
         .unwrap();
     assert_eq!(acc.data[0], 1);
-    assert_eq!(acc.data[1], 0);
+    assert_eq!(acc.data[1], 1);
     assert_eq!(acc.data[2], 50u8);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let new3_blockhash = banks_client.get_latest_blockhash().await.unwrap();
+    println!("New3 BH {:?}", new3_blockhash);
+    // Initialize account twice fail
+    let set_result = submit_txn(
+        &VersionProgramInstruction::SetString(String::from("Goober")),
+        &macc,
+        &payer,
+        new3_blockhash,
+        &mut banks_client,
+    )
+    .await;
+    assert!(set_result.is_ok());
+    // Verify set
+    let acc = banks_client
+        .get_account(account_pubkey)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(acc.data[0], 1);
+    assert_eq!(acc.data[1], 1);
+    assert_eq!(acc.data[2], 50u8);
+    println!("{:?}", acc.data);
 }
 
 #[tokio::test]
@@ -157,7 +181,7 @@ async fn test_unknown_instruction_error_pass() {
     let (mut banks_client, payer, recent_blockhash) = setup(&[account_pubkey]).await;
     // Initialize account
     let result = submit_txn(
-        &ProgramInstruction::FailInstruction,
+        &VersionProgramInstruction::FailInstruction,
         &[AccountMeta::new(account_pubkey, false)],
         &payer,
         recent_blockhash,

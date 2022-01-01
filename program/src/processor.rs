@@ -1,7 +1,8 @@
 //! Resolve instruction and execute
 
 use crate::{
-    account_state::ProgramAccountState, error::DataVersionError, instruction::ProgramInstruction,
+    account_state::ProgramAccountState, error::DataVersionError,
+    instruction::VersionProgramInstruction,
 };
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
@@ -87,11 +88,12 @@ pub fn process(
         return Err(error);
     };
     // Unpack the inbound data, mapping instruction to appropriate structure
-    let instruction = ProgramInstruction::unpack(instruction_data)?;
+    msg!("Attempting to unpack");
+    let instruction = VersionProgramInstruction::unpack(instruction_data)?;
     match instruction {
-        ProgramInstruction::InitializeAccount => initialize_account(accounts),
-        ProgramInstruction::SetU64Value(value) => set_u64_value(accounts, value),
-        ProgramInstruction::SetString(value) => set_string_value(accounts, value),
+        VersionProgramInstruction::InitializeAccount => initialize_account(accounts),
+        VersionProgramInstruction::SetU64Value(value) => set_u64_value(accounts, value),
+        VersionProgramInstruction::SetString(value) => set_string_value(accounts, value),
         _ => {
             msg!("Received unknown instruction");
             Err(DataVersionError::InvalidInstruction.into())

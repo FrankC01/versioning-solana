@@ -86,7 +86,7 @@ pub const ACCOUNT_STATE_SPACE: usize = CURRENT_USED_SIZE + CURRENT_UNUSED_SIZE;
 /// to current state of data
 fn conversion_logic(src: &[u8]) -> Result<ProgramAccountState, ProgramError> {
     let past = array_ref![src, 0, PREVIOUS_ACCOUNT_SPACE];
-    let (initialized, _, _account_space) = array_refs![
+    let (initialized, _, account_space) = array_refs![
         past,
         IS_INITIALIZED,
         DATA_VERSION_ID,
@@ -94,7 +94,7 @@ fn conversion_logic(src: &[u8]) -> Result<ProgramAccountState, ProgramError> {
     ];
     // Logic to uplift from previous version
     // GOES HERE
-    let old = try_from_slice_unchecked::<AccountContentOld>(src).unwrap();
+    let old = try_from_slice_unchecked::<AccountContentOld>(account_space).unwrap();
     // Default sets somevalue to 0 and somestring to ""
     let mut new_content = AccountContentCurrent::default();
     new_content.somevalue = old.somevalue;

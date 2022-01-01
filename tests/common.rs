@@ -1,7 +1,9 @@
 //! Common references
 
 use solana_client::rpc_client::RpcClient;
-use solana_data_versioning::{account_state::ACCOUNT_STATE_SPACE, instruction::ProgramInstruction};
+use solana_data_versioning::{
+    account_state::ACCOUNT_STATE_SPACE, instruction::VersionProgramInstruction,
+};
 
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -60,7 +62,7 @@ pub fn setup_validator() -> Result<(TestValidator, Keypair), Box<dyn error::Erro
     test_validator.add_program(PROG_NAME, PROG_KEY);
     // solana_logger::setup_with_default("solana=error");
     let test_validator =
-        test_validator.start_with_mint_address(vwallet.pubkey(), SocketAddrSpace::new(false))?;
+        test_validator.start_with_mint_address(vwallet.pubkey(), SocketAddrSpace::new(true))?;
     Ok((test_validator, vwallet))
 }
 
@@ -118,7 +120,7 @@ pub fn set_u64_value(
 
     let instruction = Instruction::new_with_borsh(
         PROG_KEY,
-        &ProgramInstruction::SetU64Value(value),
+        &VersionProgramInstruction::SetU64Value(value),
         accounts.to_vec(),
     );
     submit_transaction(rpc_client, wallet_signer, instruction, cc)?;
@@ -143,7 +145,7 @@ pub fn set_string_value(
 
     let instruction = Instruction::new_with_borsh(
         PROG_KEY,
-        &ProgramInstruction::SetString(value),
+        &VersionProgramInstruction::SetString(value),
         accounts.to_vec(),
     );
     submit_transaction(rpc_client, wallet_signer, instruction, cc)?;
@@ -180,7 +182,7 @@ fn new_account(
             ),
             Instruction::new_with_borsh(
                 *program_owner,
-                &ProgramInstruction::InitializeAccount,
+                &VersionProgramInstruction::InitializeAccount,
                 vec![
                     AccountMeta::new(account_pair.pubkey(), false),
                     AccountMeta::new(wallet_signer.pubkey(), true),
