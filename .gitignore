@@ -2,3 +2,4 @@ target/
 stored/
 .ledger/
 Cargo.lock
+.DS_Store
