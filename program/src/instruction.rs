@@ -11,7 +11,7 @@ use {
 pub enum VersionProgramInstruction {
     InitializeAccount,
     SetU64Value(u64),
-    SetString(String),
+    SetString(String), // Added with data version change
     FailInstruction,
 }
 
@@ -19,17 +19,12 @@ impl VersionProgramInstruction {
     /// Unpack inbound buffer to associated Instruction
     /// The expected format for input is a Borsh serialized vector
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        msg!("Have reached unpack");
-        msg!("Input {:?}", input);
         let payload = try_from_slice_unchecked::<VersionProgramInstruction>(input).unwrap();
         // let payload = VersionProgramInstruction::try_from_slice(input).unwrap();
         match payload {
             VersionProgramInstruction::InitializeAccount => Ok(payload),
             VersionProgramInstruction::SetU64Value(_) => Ok(payload),
-            VersionProgramInstruction::SetString(_) => {
-                msg!("SetString payload {:?}", payload);
-                Ok(payload)
-            } // Added with data version change
+            VersionProgramInstruction::SetString(_) => Ok(payload), // Added with data version change
             _ => Err(DataVersionError::InvalidInstruction.into()),
         }
     }

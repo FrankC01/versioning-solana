@@ -10,17 +10,16 @@ use solana_program::{
 };
 use std::{io::BufWriter, mem};
 
-/// Currently using state. If version changes occur, this
-/// should be copied to another serializable backlevel one
-/// before adding new fields here
+/// Current state (DATA_VERSION 1). If version changes occur, this
+/// should be copied to another (see AccountContentOld below)
+/// We've added a new field: 'somestring'
 #[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
 pub struct AccountContentCurrent {
     pub somevalue: u64,
     pub somestring: String,
 }
 
-/// Old content using state. This was the previous state
-/// of AccountContentCurrent and is used to migrate data
+/// Old content state (DATA_VERSION 0).
 #[derive(BorshDeserialize, BorshSerialize, Debug, Default, PartialEq)]
 pub struct AccountContentOld {
     pub somevalue: u64,
@@ -95,8 +94,9 @@ fn conversion_logic(src: &[u8]) -> Result<ProgramAccountState, ProgramError> {
     // Logic to uplift from previous version
     // GOES HERE
     let old = try_from_slice_unchecked::<AccountContentOld>(account_space).unwrap();
-    // Default sets somevalue to 0 and somestring to ""
+    // Default sets 'somevalue' to 0 and somestring to default ""
     let mut new_content = AccountContentCurrent::default();
+    // We copy the existing 'somevalue', the program instructions will read/update 'somestring' without fail
     new_content.somevalue = old.somevalue;
 
     // Give back
